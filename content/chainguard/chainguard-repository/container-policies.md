@@ -92,6 +92,16 @@ It accepts one parameter, `months`, an integer minimum number of months of suppo
 chainctl policies enable --policy=support-window --mode=DRY_RUN --param=months=12
 ```
 
+### licenses
+
+The `licenses` policy denies image pulls when any installed package inside the image is licensed under an identifier that has been marked as prohibited. Use it to block images that ship packages under licenses your organization cannot redistribute. An image is allowed when no package's license matches any prohibited entry.
+
+It accepts one parameter, `prohibited_licenses`, a list of SPDX license identifiers and vendor prefix patterns to deny. Accepted values come from a curated enum shipped with the policy: SPDX-standard identifiers (e.g. `GPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-2.0`) plus prefix-glob entries of the shape `LicenseRef-<Vendor>-*` (e.g. `LicenseRef-NVIDIA-*`). An empty list has no blocking effect.
+
+```shell
+chainctl policies enable --policy=licenses --mode=DRY_RUN --param=prohibited_licenses=GPL-3.0-only,AGPL-3.0-or-later,LicenseRef-NVIDIA-*
+```
+
 ## Usage
 
 Policies are managed using `chainctl`. System policies are shipped with the platform; to author your own, refer to [Managing custom policies with chainctl](#managing-custom-policies-with-chainctl).
@@ -225,7 +235,11 @@ Pulled on:   2026-06-28
 Policy: cooldown (DRY_RUN)  →  DENIED
   Reasons:
     - denied: image built within the 7-day cooldown window (built 2026-06-24, pulled 2026-06-28)
-```
+
+Policy: licenses (ENFORCED)  →  DENIED
+  Reasons:
+    - denied: pkg:apk/wolfi/example@1.0-r0 (GPL-3.0-only)
+    - denied: pkg:apk/wolfi/other@2.1-r0 (LicenseRef-NVIDIA-*)
 
 Combine `--show-decision-details` with `--artifact-id` to focus on a single image and see the full picture across every policy that evaluated it:
 
@@ -386,10 +400,8 @@ The fields below are what is available for policies whose resource type is `regi
 | `input.main_package_version` | object | Version metadata for the main package. Refer to the details below. |
 | `input.create_time` | string | When the image was created, as an RFC 3339 timestamp. Derived from the image's `org.opencontainers.image.created` annotation. |
 | `input.parameters` | object | Values for the parameters your policy declares. Refer to [Parameters](#parameters-in-custom-policies). |
-| `input.main_package_license` | string | Effective-license expression for the image's main package (SPDX identifiers, `AND`-composed over the effective-license closure). **Not yet populated at runtime — see the warning below.** |
-| `input.packages` | array | Every APK in the image, each carrying a `purl` and `license`. **Not yet populated at runtime — see the warning below.** |
-
-> **Warning:** `input.main_package_license` and `input.packages` are not yet populated at runtime, a custom policy referencing them today evaluates against empty values on every pull.
+| `input.main_package_license` | string | Effective-license expression for the image's main package (SPDX identifiers, `AND`-composed over the effective-license closure). |
+| `input.packages` | array | Every APK in the image, each carrying a `purl` and `license`. |
 
 `input.main_package_version` carries these fields:
 
@@ -785,8 +797,8 @@ At launch, the input document carries lifecycle data about the artifact's main p
 * `input.main_package_version` — version metadata, including `version`, `latestVersion`, `eolDate`, `releaseDate`, `exists`, `fips`, `lts`, `eolBroken`, and `versionSource`
 * `input.create_time` — the image creation timestamp, as RFC 3339
 * `input.parameters.<name>` — values for the parameters your policy declares
-* `input.main_package_license` — main-package effective-license expression (not yet populated)
-* `input.packages` — every APK's `purl` and `license` (not yet populated)
+* `input.main_package_license` — main-package effective-license expression
+* `input.packages` — every APK's `purl` and `license`
 
 The [input document reference](#the-input-document) has the full table with types and descriptions.
 
